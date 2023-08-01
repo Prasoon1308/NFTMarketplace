@@ -1,0 +1,8 @@
+To optimize gas costs and allow batch minting and transfers, we'll be using the ERC721A standard. Incorporate this extension of the ERC721 standard into the contract to enable minting multiple NFTs in a single transaction.
+
+ERC721A contract
+
+`function _mint(address to, uint256 quantity)` - minting new _quantity_ number of  NFTS to _address to_ 
+`function transferFrom(address from, address to, uint256 tokenId)` - Transfers _tokenId_ from _from_ to _to_ 
+`function tokenURI(uint256 tokenId)` - returns the full URI of a specific token by combining the _baseUri_ and the _tokenId_
+`function _baseURI()` - to update the base uri for the NFT
