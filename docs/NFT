@@ -35,12 +35,13 @@ FIFO
 
 Basic Notes
 
-ERC721A Implementation: To optimize gas costs and allow batch minting and transfers, we'll be using the ERC721A standard. Incorporate this extension of the ERC721 standard into the contract to enable minting multiple NFTs in a single transaction.
-Category: Two categories: Premium and Normal. Use an enum to represent the categories, and make sure to store the category information with each NFT and take the category at time of minting only.
-Pricing: The price of NFTs will be category-dependent. To implement this, create a mapping or an array to store the fixed prices for each category. When users purchase an NFT, the contract should automatically determine the price based on its category. Also add update option for category to be called by multisig or owner only.
-Presale: During the presale period (presale period will be set by admin), NFTs will be available at a discounted price compared to the original sale price. Implement the presale mechanism by applying a percentage discount on the original price. The contract should handle presale purchases separately from regular sales. (Percentage upto 2 decimal value)
-Commission Rate and Royalty: Define variables to store the commission rate and royalty percentages. When a user purchases an NFT, the contract should calculate the commission and royalty amounts and distribute the funds accordingly to the designated addresses. (Also add options to update commission and royalty percentages)
-Record Keeping: Keep track of all transactions within the contract. Create mappings or arrays to store essential information, including NFT owners, sale prices, commissions, royalties, etc. This will help us maintain transparency and accountability within the marketplace.
-Bunch Listing and Transfer: Implement the ERC721A batch transfer function to enable users to transfer multiple NFTs in a single transaction. This will significantly reduce gas costs and enhance the user experience.
+*ERC721A Implementation*: To optimize gas costs and allow batch minting and transfers, we'll be using the ERC721A standard. Incorporate this extension of the ERC721 standard into the contract to enable minting multiple NFTs in a single transaction.
+*Category*: Two categories: Premium and Normal. Use an enum to represent the categories, and make sure to store the category information with each NFT and take the category at time of minting only.
+*Pricing*: The price of NFTs will be category-dependent. To implement this, create a mapping or an array to store the fixed prices for each category. When users purchase an NFT, the contract should automatically determine the price based on its category. Also add update option for category to be called by multisig or owner only.
+*Presale*: During the presale period (presale period will be set by admin), NFTs will be available at a discounted price compared to the original sale price. Implement the presale mechanism by applying a percentage discount on the original price. The contract should handle presale purchases separately from regular sales. (Percentage upto 2 decimal value)
+*Commission Rate and Royalty*: Define variables to store the commission rate and royalty percentages. When a user purchases an NFT, the contract should calculate the commission and royalty amounts and distribute the funds accordingly to the designated addresses. (Also add options to update commission and royalty percentages)
+*Record Keeping*: Keep track of all transactions within the contract. Create mappings or arrays to store essential information, including NFT owners, sale prices, commissions, royalties, etc. This will help us maintain transparency and accountability within the marketplace.
+*Bunch Listing and Transfer*: Implement the ERC721A batch transfer function to enable users to transfer multiple NFTs in a single transaction. This will significantly reduce gas costs and enhance the user experience.
+*Mode of payment*: Both native tokens and coins.
 
 Reselling of NFTs: Reselling price?
