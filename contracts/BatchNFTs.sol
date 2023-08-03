@@ -5,10 +5,10 @@ import "./ERC721A.sol";
 import "./Ownable.sol";
 
 contract BatchNFTs is Ownable, ERC721A {
-    uint256 public constant pricePerToken = 0.01 ether;
+    uint256 public pricePerToken;
     uint256 public commissionFees = 0.001 ether;
     uint256 public startTime; // with respect to the presale
-    uint256 public duration = 259200; // 3 days of presale 
+    uint256 public duration = 3600; // 1 hour of presale 
     string private _baseTokenURI;
     uint256 public tokenId;
     address payable contractOwner = payable(owner());
@@ -29,6 +29,8 @@ contract BatchNFTs is Ownable, ERC721A {
         Category category;
     }
 
+    // maps address to the boolean showing if the address has access to the mint function
+    mapping(address => bool) public canMint;
     // maps tokenId to the token details, used to retrieve the token details of a NFT
     mapping(uint256 => ListedToken) public idToListedToken;
     // maps tokenId to the token URI of the NFT
@@ -41,6 +43,11 @@ contract BatchNFTs is Ownable, ERC721A {
     mapping(uint256 => uint256) public salePrices;
     // maps tokenId to the boolean showing whether the NFT is on sale or not
     mapping(uint256 => bool) public isNFTForSale;
+
+    modifier onlyArtist(address _artist){
+        require(canMint[_artist] == true, "Only artists are allowed to mint");
+        _;
+    }
 
     constructor() ERC721A("Test", "TT") {}
 
@@ -79,13 +86,26 @@ contract BatchNFTs is Ownable, ERC721A {
         commissionFees = newCommissionFees;
     }
 
-    // Mint new NFT ----->approval for contract to transfer(sell)
+    // Function to set the artists
+    function setArtist(address _artist) public onlyOwner {
+        canMint[_artist] = true;
+    }
+
+    function tokenPriceByCategory(uint8 _category) private onlyOwner {
+        if(_category == 0){
+            pricePerToken = 0.02 ether;
+        } else {
+            pricePerToken = 0.01 ether;
+        }
+    }
+
+    // Mint new NFT
     function mint(
         uint256 quantity,
         uint256 fees,
         Category batchCategory,
         string[] memory _tokenURIs
-    ) public payable {
+    ) public payable onlyArtist(msg.sender) {
         require(_tokenURIs.length == quantity, "Number of token URIs doesn't match with the quantity of NFTs to be minted");
         _mint(msg.sender, quantity);
         uint256 endTokenId = tokenId + quantity;
@@ -93,7 +113,7 @@ contract BatchNFTs is Ownable, ERC721A {
             uint256 _tokenId = i;
 
             for(uint256 j = 0; j < quantity; j++){
-                tokenURIs[_tokenId] = _tokenURIs[j];
+                setTokenURI(_tokenId, _tokenURIs[j]);
             }
             royaltyFees[_tokenId] = fees;
             // Update the mapping of tokenId to the NFT minter
@@ -108,17 +128,17 @@ contract BatchNFTs is Ownable, ERC721A {
                 batchCategory
             );
 
-            approve(address(this), i);
+            approve(contractOwner, i);
         }
         tokenId = endTokenId;
     }
 
-    // to update the presale duration and start 
+    // to update the presale duration and start
     function updatePresaleTime(
         uint256 _startTime,
         uint256 _duration
-    ) internal onlyOwner {
-        require(_startTime > block.timestamp + 3600, "Presale can be started only after an hour");
+    ) external onlyOwner {
+        require(_startTime > block.timestamp + 600, "Presale can be started only after 10 mins");
         startTime = _startTime;
         duration = _duration;
     }
@@ -141,7 +161,7 @@ contract BatchNFTs is Ownable, ERC721A {
 
         // -----> for different tokens, IERC20 contract needs to be inherited + real time conversion of tokens
 
-        // Transfer commission to the contract owner
+        // Transfer commission to the contract owner ----> who will pay commission fees
         (bool commissionTransferSuccess, ) = contractOwner.call{value: commissionFees}("");
         require(commissionTransferSuccess, "Failed to send commission");
 
@@ -158,13 +178,13 @@ contract BatchNFTs is Ownable, ERC721A {
     // Listing NFT open for resell
     function listNFTForSale(uint256 _tokenId, uint256 _salePrice) public {
         require(_exists(_tokenId), "Token does not exists");
+        require(idToListedToken[_tokenId].lastOwner != address(0), "NFT is freshly minted and has not been sold yet");
         salePrices[tokenId] = _salePrice;
         isNFTForSale[tokenId] = true;
     }
-    // -------> enum for token status i.e. number of times reselled
+    // -------> enum for token status i.e. number of times reselled or ListedTOken to have a counter which increases the value on resell?
     function resell(uint256 _tokenId) public payable {
         require(isNFTForSale[_tokenId], "Token is not for sale");
-        require(idToListedToken[_tokenId].lastOwner != address(0), "NFT is freshly minted and has not been sold yet");
         require(msg.value == salePrices[_tokenId], "Please submit the asking price in order to complete the purchase");
         
         address payable seller = idToListedToken[_tokenId].owner;
@@ -188,7 +208,7 @@ contract BatchNFTs is Ownable, ERC721A {
         idToListedToken[_tokenId].lastOwner = seller;
     }
 
-    // View functions
+    ////// View functions //////
     function getListedTokenForId(
         uint256 _tokenId
     ) public view returns (ListedToken memory) {
@@ -200,6 +220,15 @@ contract BatchNFTs is Ownable, ERC721A {
         return royaltyFees[_tokenId];
     }
 
+    // Sale Activity and time left for the sale to end
+    function saleActivity() public view returns (bool _saleActivity){
+        if(block.timestamp > startTime && block.timestamp < startTime + duration){
+            _saleActivity = true;
+        } else {
+            _saleActivity = false;
+        }
+        return _saleActivity;
+    }
     function saleTimeLeft() public view returns (uint256 timeLeft) {
         timeLeft = startTime + duration - block.timestamp;
     }
@@ -228,7 +257,7 @@ contract BatchNFTs is Ownable, ERC721A {
         uint itemCount = 0;
         uint currentIndex = 0;
         uint currentId;
-        // Important to get a count of all the NFTs that belong to the user before we can make an array for them
+        // Get a count of all the NFTs that belong to the user
         for (uint i = 0; i < totalItemCount; i++) {
             if (
                 idToListedToken[i + 1].owner == msg.sender ||
@@ -238,7 +267,7 @@ contract BatchNFTs is Ownable, ERC721A {
             }
         }
 
-        // Once you have the count of relevant NFTs, create an array then store all the NFTs in it
+        // Storing all the relevant NFTs in an array
         ListedToken[] memory items = new ListedToken[](itemCount);
         for (uint i = 0; i < totalItemCount; i++) {
             if (
