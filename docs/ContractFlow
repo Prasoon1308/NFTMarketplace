@@ -1,0 +1,20 @@
+# BatchNFTs
+
+
+## Functions
+#### onlyOwner (Contract deployer)
+
+--> `setBaseURI(string calldata baseURI)` : this function updates the _ _baseTokenURI_ which can be used to set the _tokenURI_ in combination with the _tokenId_.
+--> `setCommissionFees(uint256 newCommissionFees)` : this function is used to update the platform/marketplace _commissionFees_. Max fees that can be charged is restricted to half of the token price.
+--> `setArtist(address _artist)` : this function is used to give access to the trusted addresses to mint new NFTs. _canMint_ mapping is updated to give true value on check.
+--> `tokenPriceByCategory(uint8 _category)` : this function updates the value of _pricePerToken_ according to the category (premium or normal).
+--> `updatePresaleTime(uint256 _startTime, uint256 _duration)` :this function is used to set the presale _startTime_ and _duration_. Requirement is that the start time can start earliest after a min.
+
+## Contract Flow
+
+On deploying the contract, the address of the deployer will be saved in _contractOwner_. The contract owner can give access to an address for minting new NFTs using `setArtist` function.
+
+The address with access can use the `mintNFT` function to mint new NFTs ( bunch or single)
+
+The contract owner can also set the time of start of the presale using the `updatePresaleTime` function.
+
