@@ -1,6 +1,6 @@
 To optimize gas costs and allow batch minting and transfers, we'll be using the ERC721A standard. Incorporate this extension of the ERC721 standard into the contract to enable minting multiple NFTs in a single transaction.
 
-#ERC721A contract
+## ERC721A contract
 
 `function _mint(address to, uint256 quantity)` - minting new _quantity_ number of  NFTS to address _to_ 
 `function transferFrom(address from, address to, uint256 tokenId)` - Transfers _tokenId_ from _from_ to _to_ 
@@ -8,4 +8,6 @@ To optimize gas costs and allow batch minting and transfers, we'll be using the 
 `function _baseURI()` - to update the base uri for the NFT
 `function approve(address to, uint256 tokenId)` - to approve the address _to_ to transfer _tokenId_ to another account
 ---> we will be using this function to give access to the contract owner to approve the transaction of an NFT at the time of mint of the NFT.
+---> requirement for calling this function: The caller must own the token or be an approved operator
 `function _exists(uint256 tokenId)` - to check whether the token of _tokenId_ exists
+`function setApprovalForAll(address operator, bool approved)` - Approve or remove _operator_ as an operator for for any token owned by the caller
