@@ -16,5 +16,8 @@ On deploying the contract, the address of the deployer will be saved in _contrac
 
 The address with access can use the `mintNFT` function to mint new NFTs ( bunch or single)
 
+The contract owner has to give acccess to an address to approve the transaction on its behalf using th e `approve` function 
+
 The contract owner can also set the time of start of the presale using the `updatePresaleTime` function.
 
+For the value of _ _saleActivity_ from the function `saleActivity` as true, the buyer can use the `presale` function 
