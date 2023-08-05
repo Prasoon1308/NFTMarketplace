@@ -16,8 +16,12 @@ On deploying the contract, the address of the deployer will be saved in _contrac
 
 The address with access can use the `mintNFT` function to mint new NFTs ( bunch or single)
 
-The contract owner has to give acccess to an address to approve the transaction on its behalf using th e `approve` function 
+The contract owner has to give acccess to an address to approve the transaction on its behalf using the `approve` function. 
 
-The contract owner can also set the time of start of the presale using the `updatePresaleTime` function.
+The contract owner can also set the time of start of the presale and the duration of presale using the `updatePresaleTime` function.
 
-For the value of _ _saleActivity_ from the function `saleActivity` as true, the buyer can use the `presale` function 
+For the value of _ _saleActivity_ from the function `saleActivity` as true, the buyer can use the `presale` function to buy the newly minted NFTs. The buyer has to send the amount of _presalePrice_ to buy the NFT.
+
+To resell an NFT, the owner has to list the NFT open for sell using the function `listNFTForSale` with new reselling price. Freshly minted NFTs cannot be listed for this. 
+
+The interested buyers can buy the NFT using the `resell` function (if the address has an approval for the transaction). The buyer can view the amount that has to be sent by viewing the `salePrices` mapping for that _ _tokenId_. 
