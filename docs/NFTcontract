@@ -7,7 +7,9 @@ To optimize gas costs and allow batch minting and transfers, we'll be using the 
 `function tokenURI(uint256 tokenId)` - returns the full URI of a specific token by combining the _baseUri_ and the _tokenId_
 `function _baseURI()` - to update the base uri for the NFT
 `function approve(address to, uint256 tokenId)` - to approve the address _to_ to transfer _tokenId_ to another account
----> we will be using this function to give access to the contract owner to approve the transaction of an NFT at the time of mint of the NFT.
+---> we will be using this function to give access to the contract owner to approve the transaction of an NFT at the time of mint of the NFT. Here the _to_ address has to be different than the NFT owner. 
 ---> requirement for calling this function: The caller must own the token or be an approved operator
 `function _exists(uint256 tokenId)` - to check whether the token of _tokenId_ exists
 `function setApprovalForAll(address operator, bool approved)` - Approve or remove _operator_ as an operator for for any token owned by the caller
+
+=>the function caller needs to be an approved function, in this case we need to allow the new buyer to first get access to approve a transaction on behalf of the seller.
