@@ -12,7 +12,7 @@ async function main() {
 
   console.log(
     `Deploy ERC721A contract and schedule mint to open on block ${latestBlock.timestamp}`,
-    // `Deployed to https://mumbai.polygonscan.com/address/${batchNFTs.address}`
+    `Deployed to https://goerli.etherscan.io/address/${batchNFTs.address}`
   );
 }
 
