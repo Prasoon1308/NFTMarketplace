@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "./ERC721A.sol";
-import "./Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract BatchNFTs is Ownable, ERC721A {
     uint256 private pricePerToken;
@@ -10,7 +10,7 @@ contract BatchNFTs is Ownable, ERC721A {
     uint256 public startTime; // with respect to the presale
     uint256 public duration = 3600; // 1 hour of presale 
     string private _baseTokenURI;
-    uint256 public tokenId;
+    uint256 public tokenNumber;
     address payable contractOwner = payable(owner());
 
     // Enum to specify the categories of an NFT
@@ -34,6 +34,8 @@ contract BatchNFTs is Ownable, ERC721A {
 
     // maps address to the boolean showing if the address has access to the mint function
     mapping(address => bool) public canMint;
+    // maps address to the boolean showing if the address has access to some of the contract set functions
+    mapping(address=>bool) public moderator;
     // maps tokenId to the token details, used to retrieve the token details of a NFT
     mapping(uint256 => ListedToken) public idToListedToken;
     // maps tokenId to the token URI of the NFT
@@ -47,14 +49,31 @@ contract BatchNFTs is Ownable, ERC721A {
     // maps tokenId to the boolean showing whether the NFT is on sale or not
     mapping(uint256 => bool) public isNFTForSale;
 
+
     modifier onlyArtist(address _artist){
         require(canMint[_artist] == true, "Only artists are allowed to mint");
         _;
     }
 
-    constructor() ERC721A("Test", "TT") {}
+    modifier onlyModerator(address _moderator){
+        require(moderator[_moderator] == true, "Only moderators are allowed to modify this function");
+        _;
+    }
 
-    function setBaseURI(string calldata baseURI) external onlyOwner {
+    constructor() ERC721A("Test", "TT") {
+        moderator[msg.sender] = true;
+    }
+
+    // Function to set the moderator for the contract
+    function setModerator(address _moderator) public onlyOwner {
+        moderator[_moderator] = true;
+    }
+    // Function to set the artists who can turn their art to an NFT
+    function setArtist(address _artist) public onlyModerator(msg.sender) {
+        canMint[_artist] = true;
+    }
+
+    function setBaseURI(string calldata baseURI) external onlyModerator(msg.sender) {
         _baseTokenURI = baseURI;
     }
 
@@ -83,18 +102,13 @@ contract BatchNFTs is Ownable, ERC721A {
 
         return super.tokenURI(_tokenId);
     }
-    // Function to set the commission fees
-    function setCommissionFees(uint256 newCommissionFees) public onlyOwner {
+    // Function to change the commission fees
+    function changeCommissionFees(uint256 newCommissionFees) public onlyModerator(msg.sender) {
         require(newCommissionFees < pricePerToken * 5 / 10, "New commission price is very high");
         commissionFees = newCommissionFees;
     }
 
-    // Function to set the artists
-    function setArtist(address _artist) public onlyOwner {
-        canMint[_artist] = true;
-    }
-
-    function tokenPriceByCategory(uint8 _category) public onlyOwner {
+    function tokenPriceByCategory(uint8 _category) public {
         if(_category == 0){
             pricePerToken = 0.02 ether;
         } else {
@@ -115,8 +129,8 @@ contract BatchNFTs is Ownable, ERC721A {
 
         _mint(msg.sender, quantity);
 
-        uint256 endTokenId = tokenId + quantity;
-        for (uint256 i = tokenId; i < endTokenId; i++) {
+        uint256 endTokenId = tokenNumber + quantity;
+        for (uint256 i = tokenNumber; i < endTokenId; i++) {
             uint256 _tokenId = i;
 
             for(uint256 j = 0; j < quantity; j++){
@@ -134,17 +148,16 @@ contract BatchNFTs is Ownable, ERC721A {
                 fees, // royalty fees
                 batchCategory
             );
-            approve(contractOwner, i);
             emit tokenHistory(i, pricePerToken);
         }
-        tokenId = endTokenId;
+        tokenNumber = endTokenId;
     }
 
     // to update the presale duration and start
     function updatePresaleTime(
         uint256 _startTime,
         uint256 _duration
-    ) external onlyOwner {
+    ) external onlyModerator(msg.sender) {
         require(_startTime > block.timestamp + 60, "Presale can be started only after 1 min");
         startTime = _startTime;
         duration = _duration;
@@ -165,8 +178,6 @@ contract BatchNFTs is Ownable, ERC721A {
         address payable seller = idToListedToken[_tokenId].owner;
         // transfer the token to the new owner - from, to, tokenId
         transferFrom(seller, msg.sender, _tokenId);
-
-        // -----> for different tokens, IERC20 contract needs to be inherited + real time conversion of tokens
 
         // Transfer commission to the contract owner ----> who will pay commission fees
         (bool commissionTransferSuccess, ) = contractOwner.call{value: commissionFees}("");
@@ -242,7 +253,7 @@ contract BatchNFTs is Ownable, ERC721A {
     
     // This will return all the NFTs currently listed to be sold on the marketplace
     function getAllNFTs() public view returns (ListedToken[] memory) {
-        uint nftCount = tokenId;
+        uint nftCount = tokenNumber;
         ListedToken[] memory tokens = new ListedToken[](nftCount);
         uint currentIndex = 0;
         uint currentId;
@@ -260,7 +271,7 @@ contract BatchNFTs is Ownable, ERC721A {
  
     //Returns all the NFTs that the current user is owner or seller in
     function getMyNFTs() public view returns (ListedToken[] memory) {
-        uint totalItemCount = tokenId;
+        uint totalItemCount = tokenNumber;
         uint itemCount = 0;
         uint currentIndex = 0;
         uint currentId;
