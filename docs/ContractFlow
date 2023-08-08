@@ -14,6 +14,8 @@
 
 On deploying the contract, the address of the deployer will be saved in _contractOwner_. The contract owner can give access to an address for minting new NFTs using `setArtist` function.
 
+To access some of the set/change functions of the contract, access can be given to _moderator_ using the `setModerator` function. By default the contract owner will also get the moderator access. This function is used to implement the idea of multisig wallet usage for some of the functions later. 
+
 The address with access can use the `mintNFT` function to mint new NFTs ( bunch or single)
 
 The contract owner has to give acccess to an address to approve the transaction on its behalf using the `approve` function. 
