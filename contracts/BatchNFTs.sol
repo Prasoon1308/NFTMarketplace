@@ -4,13 +4,15 @@ pragma solidity ^0.8.13;
 import "./ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+// contract address - 0x3085d1faA1Ed0DB1B851a7e49B99221e5A24B715
+// contract address - 0xAf0281ECc867DE011203F652D8795a310F609f11
 contract BatchNFTs is Ownable, ERC721A {
     uint256 private pricePerToken;
     uint256 public commissionFees = 0.001 ether;
     uint256 public startTime; // with respect to the presale
     uint256 public duration = 3600; // 1 hour of presale 
     string private _baseTokenURI;
-    uint256 public tokenNumber;
+    uint256 tokenNumber;
     address payable contractOwner = payable(owner());
 
     // Enum to specify the categories of an NFT
@@ -30,7 +32,8 @@ contract BatchNFTs is Ownable, ERC721A {
     }
 
     // Events for the write functions:
-    event tokenHistory(uint256 _tokenId, uint256 _salePrice);
+    event tokenHistory(uint256 _tokenId, address _owner, uint256 _salePrice);
+    event tokenUri(uint256 _tokenId, string _tokenUri);
 
     // maps address to the boolean showing if the address has access to the mint function
     mapping(address => bool) public canMint;
@@ -55,6 +58,8 @@ contract BatchNFTs is Ownable, ERC721A {
         _;
     }
 
+
+    // moderator will be a multisig admin wallet
     modifier onlyModerator(address _moderator){
         require(moderator[_moderator] == true, "Only moderators are allowed to modify this function");
         _;
@@ -108,7 +113,7 @@ contract BatchNFTs is Ownable, ERC721A {
         commissionFees = newCommissionFees;
     }
 
-    function tokenPriceByCategory(uint8 _category) public {
+    function tokenPriceByCategory(uint8 _category) internal {
         if(_category == 0){
             pricePerToken = 0.02 ether;
         } else {
@@ -135,6 +140,7 @@ contract BatchNFTs is Ownable, ERC721A {
 
             for(uint256 j = 0; j < quantity; j++){
                 setTokenURI(_tokenId, _tokenURIs[j]);
+                emit tokenUri(_tokenId, _tokenURIs[j]);
             }
             royaltyFees[_tokenId] = fees;
             // Update the mapping of tokenId to the NFT minter
@@ -148,7 +154,7 @@ contract BatchNFTs is Ownable, ERC721A {
                 fees, // royalty fees
                 batchCategory
             );
-            emit tokenHistory(i, pricePerToken);
+            emit tokenHistory(i, msg.sender, pricePerToken);
         }
         tokenNumber = endTokenId;
     }
@@ -223,7 +229,7 @@ contract BatchNFTs is Ownable, ERC721A {
         //update the details of the token
         idToListedToken[_tokenId].owner = payable(msg.sender);
         idToListedToken[_tokenId].lastOwner = seller;
-        emit tokenHistory(_tokenId, salePrices[_tokenId]);
+        emit tokenHistory(_tokenId, msg.sender, salePrices[_tokenId]);
     }
 
     ////// View functions //////
@@ -247,7 +253,12 @@ contract BatchNFTs is Ownable, ERC721A {
         }
         return _saleActivity;
     }
+    function getStartTime() public view returns(uint256){
+        require(startTime>0, "Sale has not been listed yet");
+        return startTime;
+    }
     function saleTimeLeft() public view returns (uint256 timeLeft) {
+        require(startTime>0, "Sale has not been listed yet");
         timeLeft = startTime + duration - block.timestamp;
     }
     
