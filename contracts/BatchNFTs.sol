@@ -13,7 +13,7 @@ contract BatchNFTs is Ownable, ERC721A {
     uint256 public duration = 3600; // 1 hour of presale 
     string private _baseTokenURI;
     uint256 tokenNumber;
-    address payable contractOwner = payable(owner());
+    address public contractOwner;
 
     // Enum to specify the categories of an NFT
     enum Category {
@@ -67,6 +67,7 @@ contract BatchNFTs is Ownable, ERC721A {
 
     constructor() ERC721A("Test", "TT") {
         moderator[msg.sender] = true;
+        contractOwner = msg.sender;
     }
 
     // Function to set the moderator for the contract
@@ -164,7 +165,7 @@ contract BatchNFTs is Ownable, ERC721A {
         uint256 _startTime,
         uint256 _duration
     ) external onlyModerator(msg.sender) {
-        require(_startTime > block.timestamp + 60, "Presale can be started only after 1 min");
+        require(_startTime > block.timestamp + 10, "Presale can be started only after 10 sec");
         startTime = _startTime;
         duration = _duration;
     }
@@ -186,7 +187,7 @@ contract BatchNFTs is Ownable, ERC721A {
         transferFrom(seller, msg.sender, _tokenId);
 
         // Transfer commission to the contract owner ----> who will pay commission fees
-        (bool commissionTransferSuccess, ) = contractOwner.call{value: commissionFees}("");
+        (bool commissionTransferSuccess, ) = payable(contractOwner).call{value: commissionFees}("");
         require(commissionTransferSuccess, "Failed to send commission");
 
         // Transfer remaining amount to the seller
@@ -215,7 +216,7 @@ contract BatchNFTs is Ownable, ERC721A {
         transferFrom(seller, msg.sender, _tokenId);
 
         // Transfer commission to the contract owner
-        (bool commissionTransferSuccess, ) = contractOwner.call{value: commissionFees}("");
+        (bool commissionTransferSuccess, ) = payable(contractOwner).call{value: commissionFees}("");
         require(commissionTransferSuccess, "Failed to send commission fees");
 
         // Transfer royalty fees to the artist
