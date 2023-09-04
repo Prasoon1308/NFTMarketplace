@@ -4,8 +4,6 @@ pragma solidity ^0.8.13;
 import "./ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// contract address - 0x3085d1faA1Ed0DB1B851a7e49B99221e5A24B715
-// contract address - 0xAf0281ECc867DE011203F652D8795a310F609f11
 contract BatchNFTs is Ownable, ERC721A {
     uint256 public commissionFees = 0.001 ether;
     uint256 public startTime; // with respect to the presale
@@ -59,8 +57,6 @@ contract BatchNFTs is Ownable, ERC721A {
         _;
     }
 
-
-    // moderator will be a multisig admin wallet
     modifier onlyModerator(address _moderator){
         require(moderator[_moderator] == true, "Only moderators are allowed to modify this function");
         _;
@@ -113,18 +109,18 @@ contract BatchNFTs is Ownable, ERC721A {
     function changeCommissionFees(uint256 newCommissionFees) public onlyModerator(msg.sender) {
         commissionFees = newCommissionFees;
     }
-    // set category wise price ---> add onlyartist modifier
-    function setTokenPricebyCategory(Category _category, uint256 _categoryPrice) public {
+    // set category wise price
+    function setTokenPricebyCategory(Category _category, uint256 _categoryPrice) public onlyArtist(msg.sender){
         pricePerTokenCategory[_category] = _categoryPrice;
     }
 
-    // Mint new NFT ---> add onlyartist modifier
+    // Mint new NFT 
     function mint(
         uint256 quantity,
         uint256 fees,
         Category batchCategory,
         string[] memory _tokenURIs
-    ) public payable {
+    ) public payable onlyArtist(msg.sender){
         require(_tokenURIs.length == quantity, "Number of token URIs doesn't match with the quantity of NFTs to be minted");
         // Set the pricePerToken based on the selected category
         require(pricePerTokenCategory[batchCategory]>0, "Category price is not set yet");
@@ -161,7 +157,7 @@ contract BatchNFTs is Ownable, ERC721A {
         startTime = _startTime;
         duration = _duration;
     }
-    
+
     // Presale of newly minted NFTs only 
     function presale(uint256 _tokenId) public payable {
         require(block.timestamp >= startTime, "Sale not started");
@@ -267,24 +263,6 @@ contract BatchNFTs is Ownable, ERC721A {
     function saleTimeLeft() public view returns (uint256 timeLeft) {
         require(startTime>0, "Sale has not been listed yet");
         timeLeft = startTime + duration - block.timestamp;
-    }
-    
-    // This will return all the NFTs currently listed to be sold on the marketplace
-    function getAllNFTs() public view returns (ListedToken[] memory) {
-        uint nftCount = _finalTokenId - 1; 
-        ListedToken[] memory tokens = new ListedToken[](nftCount);
-        uint currentIndex = 0;
-        uint currentId;
-        // at the moment currentlyListed is true for all, if it becomes false in the future we will
-        // filter out currentlyListed == false over here
-        for (uint i = 0; i < nftCount; i++) {
-            currentId = i + 1;
-            ListedToken storage currentItem = idToListedToken[currentId];
-            tokens[currentIndex] = currentItem;
-            currentIndex += 1;
-        }
-        // the array 'tokens' has the list of all NFTs in the marketplace
-        return tokens;
     }
  
     //Returns all the NFTs that the current user is owner or seller in
