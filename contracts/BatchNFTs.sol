@@ -1,24 +1,27 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.13;
 
 import "./ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract BatchNFTs is Ownable, ERC721A {
-    uint256 public commissionFees = 0.001 ether;
-    uint256 public startTime; // with respect to the presale
-    uint256 public duration = 3600; // 1 hour of presale 
+// Main contract for BatchNFTs
+contract BatchNFTs is Ownable, ERC721A, ReentrancyGuard {
+    // State variables
+    uint256 public commissionFees;
+    uint256 public startTime;
+    uint256 public duration;
+    uint256 public presaleDiscount; // Discount percentage for presale
     string private _baseTokenURI;
-    address public contractOwner;
-    uint256 public _finalTokenId = _nextTokenId();
 
-    // Enum to specify the categories of an NFT
+    // Enum for NFT categories
     enum Category {
         Premium,
         Normal
     }
 
-    //The structure to store info about a listed token
+    // Struct for listed tokens
     struct ListedToken {
         uint256 tokenId;
         address owner;
@@ -26,71 +29,212 @@ contract BatchNFTs is Ownable, ERC721A {
         uint256 price;
         uint256 royalty;
         Category category;
+        bool isForSale;
     }
 
-    // Events for the write functions:
-    event tokenHistory(uint256 _tokenId, address _owner, uint256 _salePrice);
-    event tokenUri(uint256 _tokenId, string _tokenUri);
+    // Events
+    event TokenHistory(uint256 tokenId, address owner, uint256 salePrice);
+    event TokenUri(uint256 tokenId, string tokenUri);
 
-    // maps address to the boolean showing if the address has access to the mint function
+    // Mappings
     mapping(address => bool) public canMint;
-    // maps address to the boolean showing if the address has access to some of the contract set functions
-    mapping(address=>bool) public moderator;
-    // maps to category enum  to the token price get token price category wise
-    mapping(Category=>uint256) pricePerTokenCategory;
-    // maps tokenId to the token details, used to retrieve the token details of a NFT
+    mapping(address => bool) public moderator;
+    mapping(Category => uint256) public pricePerTokenCategory;
     mapping(uint256 => ListedToken) public idToListedToken;
-    // maps tokenId to the token URI of the NFT
-    mapping(uint256 => string) public tokenURIs;
-    // maps tokenId to the original creator of the NFT
+    mapping(uint256 => string) tokenURIs;
     mapping(uint256 => address) public originalCreators;
-    // maps tokenId to the royalty fees of the original creator
-    mapping(uint256 => uint256) public royaltyFees;
-    // maps tokenId to the initial sale price of the NFT
-    mapping(uint256 => uint256) public salePrices;
-    // maps tokenId to the boolean showing whether the NFT is on sale or not
-    mapping(uint256 => bool) public isNFTForSale;
 
-
-    modifier onlyArtist(address _artist){
-        require(canMint[_artist] == true, "Only artists are allowed to mint");
+    // Modifiers
+    modifier onlyArtist() {
+        require(canMint[msg.sender], "Only artists are allowed to mint");
         _;
     }
 
-    modifier onlyModerator(address _moderator){
-        require(moderator[_moderator] == true, "Only moderators are allowed to modify this function");
+    modifier onlyModerator() {
+        require(
+            moderator[msg.sender],
+            "Only moderators are allowed to modify this function"
+        );
         _;
     }
 
-    constructor() ERC721A("Test", "TT") {
+    // Constructor to initialize state variables
+    constructor(uint256 _commissionFees, uint256 _duration)
+        ERC721A("Azuki NFT", "AZUKI")
+    {
         moderator[msg.sender] = true;
-        contractOwner = msg.sender;
+        canMint[msg.sender] = true;
+        commissionFees = _commissionFees;
+        duration = _duration;
+        startTime = block.timestamp;
     }
 
-    // Function to set the moderator for the contract
+    // Function to set a new moderator
     function setModerator(address _moderator) public onlyOwner {
+        require(!moderator[_moderator], "Already a moderator");
         moderator[_moderator] = true;
     }
-    // Function to set the artists who can turn their art to an NFT
-    function setArtist(address _artist) public onlyModerator(msg.sender) {
+
+    // Function to set a new artist
+    function setArtist(address _artist) public onlyModerator {
+        require(!canMint[_artist], "Already an artist");
         canMint[_artist] = true;
     }
 
-    function setBaseURI(string calldata baseURI) external onlyModerator(msg.sender) {
+    // Function to set the base URI for tokens
+    function setBaseURI(string calldata baseURI) external onlyModerator {
         _baseTokenURI = baseURI;
     }
 
+    // Internal function to return the base URI
     function _baseURI() internal view override returns (string memory) {
         return _baseTokenURI;
     }
 
-    // Set token URI
-    function setTokenURI(uint256 _tokenId, string memory _tokenURI) internal {
-        tokenURIs[_tokenId] = _tokenURI;
+    // Internal function to set the token URI
+    function setTokenURI(uint256 tokenId, string memory _tokenURI) internal {
+        tokenURIs[tokenId] = _tokenURI;
+        emit TokenUri(tokenId, _tokenURI);
     }
 
-    function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
+    // Function to change the commission fees
+    function changeCommissionFees(uint256 newCommissionFees)
+        public
+        onlyModerator
+    {
+        commissionFees = newCommissionFees;
+    }
 
+    // Function to set the price per token category
+    function setTokenPricebyCategory(Category category, uint256 categoryPrice)
+        public
+        onlyArtist
+    {
+        pricePerTokenCategory[category] = categoryPrice;
+    }
+
+    // Function to set the presale discount percentage
+    function setPresaleDiscount(uint256 _presaleDiscount) public onlyOwner {
+        require(_presaleDiscount < 100, "Discount cannot be 100% or more");
+        presaleDiscount = _presaleDiscount;
+    }
+
+    // Function to mint new tokens
+    function mint(
+        uint256 quantity,
+        uint256 fees,
+        Category batchCategory,
+        string[] memory _tokenURIs
+    ) public onlyArtist nonReentrant {
+        require(
+            _tokenURIs.length == quantity,
+            "Mismatch between URIs and quantity"
+        );
+        require(
+            pricePerTokenCategory[batchCategory] > 0,
+            "Category price not set"
+        );
+
+        uint256 price = pricePerTokenCategory[batchCategory];
+        uint256 tokenId = totalSupply();
+        _mint(msg.sender, quantity);
+
+        for (uint256 i = 0; i < quantity; i++) {
+            setTokenURI(tokenId, _tokenURIs[i]);
+            originalCreators[tokenId] = msg.sender;
+            idToListedToken[tokenId] = ListedToken(
+                tokenId,
+                msg.sender,
+                address(0),
+                price,
+                fees,
+                batchCategory,
+                true
+            );
+            tokenId++;
+        }
+    }
+
+    // Function to update the presale time
+    function updatePresaleTime(uint256 _startTime, uint256 _duration)
+        external
+        onlyModerator
+    {
+        require(_startTime > block.timestamp, "Invalid start time");
+        require(_duration > 0, "Duration must be greater than zero");
+        startTime = _startTime;
+        duration = _duration;
+    }
+
+    // Function to handle presale
+    function presale(uint256 tokenId) public payable {
+        require(
+            block.timestamp >= startTime &&
+                block.timestamp <= startTime + duration,
+            "Not in presale period"
+        );
+        ListedToken storage listedToken = idToListedToken[tokenId];
+        require(listedToken.lastOwner == address(0), "Token already sold");
+
+        uint256 presalePrice = (listedToken.price * (100 - presaleDiscount)) /
+            100;
+        require(msg.value >= presalePrice, "Incorrect value sent");
+
+        _handleSale(listedToken, presalePrice);
+    }
+
+    // Function to list a token for sale
+    function listNFTForSale(uint256 tokenId, uint256 salePrice) public {
+        require(_exists(tokenId), "Token does not exist");
+        ListedToken storage listedToken = idToListedToken[tokenId];
+        require(listedToken.owner == msg.sender, "Not the owner");
+
+        listedToken.isForSale = true;
+        listedToken.price = salePrice;
+    }
+
+    // Function to handle a sale
+    function sale(uint256 tokenId) public payable {
+        ListedToken storage listedToken = idToListedToken[tokenId];
+        require(listedToken.isForSale, "Token not for sale");
+        require(msg.value >= listedToken.price, "Incorrect value sent");
+
+        _handleSale(listedToken, listedToken.price);
+    }
+
+    // Internal function to handle the sale logic
+    function _handleSale(ListedToken storage listedToken, uint256 salePrice)
+        internal
+    {
+        address payable seller = payable(listedToken.owner);
+        internalTransfer(seller, msg.sender, listedToken.tokenId);
+
+        payable(owner()).transfer(commissionFees);
+        payable(originalCreators[listedToken.tokenId]).transfer(
+            listedToken.royalty
+        );
+
+        uint256 remainingAmount = salePrice -
+            commissionFees -
+            listedToken.royalty;
+        seller.transfer(remainingAmount);
+
+        listedToken.owner = msg.sender;
+        listedToken.lastOwner = seller;
+        listedToken.price = salePrice;
+        listedToken.isForSale = false;
+
+        emit TokenHistory(listedToken.tokenId, msg.sender, salePrice);
+    }
+
+    // View token uri for of any token
+    function tokenURI(uint256 _tokenId)
+        public
+        view
+        virtual
+        override
+        returns (string memory)
+    {
         string memory _tokenURI = tokenURIs[_tokenId];
         string memory base = _baseURI();
 
@@ -105,193 +249,65 @@ contract BatchNFTs is Ownable, ERC721A {
 
         return super.tokenURI(_tokenId);
     }
-    // Function to change the commission fees
-    function changeCommissionFees(uint256 newCommissionFees) public onlyModerator(msg.sender) {
-        commissionFees = newCommissionFees;
-    }
-    // set category wise price
-    function setTokenPricebyCategory(Category _category, uint256 _categoryPrice) public onlyArtist(msg.sender){
-        pricePerTokenCategory[_category] = _categoryPrice;
-    }
 
-    // Mint new NFT 
-    function mint(
-        uint256 quantity,
-        uint256 fees,
-        Category batchCategory,
-        string[] memory _tokenURIs
-    ) public payable onlyArtist(msg.sender){
-        require(_tokenURIs.length == quantity, "Number of token URIs doesn't match with the quantity of NFTs to be minted");
-        // Set the pricePerToken based on the selected category
-        require(pricePerTokenCategory[batchCategory]>0, "Category price is not set yet");
-        uint256 _price = pricePerTokenCategory[batchCategory];
-
-        _mint(msg.sender, quantity);
-        uint256 _index = 0;
-        for (uint256 i = _finalTokenId; i < _finalTokenId + quantity; i++) {
-            setTokenURI(i, _tokenURIs[_index]);
-            emit tokenUri(i, _tokenURIs[_index]);
-            _index++;
-            royaltyFees[i] = fees;
-            // Update the mapping of tokenId to the NFT minter
-            originalCreators[i] = msg.sender;
-            // Update the mapping of tokenId's to Token details
-            idToListedToken[i] = ListedToken(
-                i,
-                msg.sender,
-                address(0), // last owner
-                _price,
-                fees, // royalty fees
-                batchCategory
-            );
-        }
-        _finalTokenId = _finalTokenId + quantity;
+    // View function to get details of a listed token by its ID
+    function getListedTokenForId(uint256 tokenId)
+        public
+        view
+        returns (ListedToken memory)
+    {
+        return idToListedToken[tokenId];
     }
 
-    // to update the presale duration and start
-    function updatePresaleTime(
-        uint256 _startTime,
-        uint256 _duration
-    ) external onlyModerator(msg.sender) {
-        require(_startTime > block.timestamp + 10, "Presale can be started only after 10 sec");
-        startTime = _startTime;
-        duration = _duration;
+    // View function to get royalty fees for a specific token
+    function getRoyaltyFees(uint256 tokenId) public view returns (uint256) {
+        require(_exists(tokenId), "Token does not exist");
+        return idToListedToken[tokenId].royalty;
     }
 
-    // Presale of newly minted NFTs only 
-    function presale(uint256 _tokenId) public payable {
-        require(block.timestamp >= startTime, "Sale not started");
-        require(block.timestamp <= startTime + duration, "Sale has ended");
-        uint256 presalePrice = idToListedToken[_tokenId].price * 8 / 10;
-        require(
-            msg.value == presalePrice && msg.value > commissionFees,
-            "Please submit the asking price in order to complete the purchase"
-        );
-        require(idToListedToken[_tokenId].lastOwner == address(0), "Token already sold, not under presale");
-
-        
-        address payable seller = payable(idToListedToken[_tokenId].owner);
-        // transfer the token to the new owner - from, to, tokenId
-        transferFrom(seller, msg.sender, _tokenId);
-
-        // Transfer commission to the contract owner 
-        (bool commissionTransferSuccess, ) = payable(contractOwner).call{value: commissionFees}("");
-        require(commissionTransferSuccess, "Failed to send commission");
-
-        // Transfer remaining amount to the seller
-        uint256 remainingAmount = msg.value - commissionFees;
-        (bool remainingAmountTransferSuccess, ) = payable(seller).call{value: remainingAmount}("");
-        require(remainingAmountTransferSuccess, "Failed to send remaining amount");
-        
-        //update the details of the token
-        idToListedToken[_tokenId].owner = payable(msg.sender);
-        idToListedToken[_tokenId].lastOwner = seller;
-        idToListedToken[_tokenId].price = presalePrice;
-        emit tokenHistory(_tokenId, msg.sender, presalePrice);
-    }
-
-    function endOfPresale()public onlyArtist(msg.sender){
-        require(!saleActivity(), "Presale is still ongoing");
-        for(uint i = 0; i<_nextTokenId(); i++){
-            if(idToListedToken[i].lastOwner == address(0)){
-                isNFTForSale[i] = true;
-                salePrices[i] = idToListedToken[i].price;
-            }
-        }
-    }
-
-    // Listing NFT open for resell
-    function listNFTForSale(uint256 _tokenId, uint256 _salePrice) public {
-        require(_exists(_tokenId), "Token does not exists");
-        salePrices[_tokenId] = _salePrice;
-        isNFTForSale[_tokenId] = true;
-    }
-    
-    // sale of NFTs (resell + ones which were unsold in presale)
-    function sale(uint256 _tokenId) public payable {
-        require(isNFTForSale[_tokenId], "Token is not for sale");
-        require(msg.value == salePrices[_tokenId], "Please submit the asking price in order to complete the purchase");
-        
-        address payable seller = payable(idToListedToken[_tokenId].owner);
-        // transfer the token to the new owner - from, to, tokenId
-        transferFrom(seller, msg.sender, _tokenId);
-
-        // Transfer commission to the contract owner
-        (bool commissionTransferSuccess, ) = payable(contractOwner).call{value: commissionFees}("");
-        require(commissionTransferSuccess, "Failed to send commission fees");
-
-        // Transfer royalty fees to the artist
-        (bool royaltyTransferSuccess, ) = payable(originalCreators[_tokenId]).call{value: royaltyFees[_tokenId]}("");
-        require(royaltyTransferSuccess, "Failed to send royalty fees");
-        // Transfer remaining amount to the seller
-        uint256 remainingAmount = msg.value - commissionFees - royaltyFees[_tokenId];
-        (bool remainingAmountTransferSuccess, ) = payable(seller).call{value: remainingAmount}("");
-        require(remainingAmountTransferSuccess, "Failed to send remaining amount");
-        
-        //update the details of the token
-        idToListedToken[_tokenId].owner = payable(msg.sender);
-        idToListedToken[_tokenId].lastOwner = seller;
-        idToListedToken[_tokenId].price = salePrices[_tokenId];
-        emit tokenHistory(_tokenId, msg.sender, salePrices[_tokenId]);
-    }
-
-    ////// View functions //////
-    function getListedTokenForId(
-        uint256 _tokenId
-    ) public view returns (ListedToken memory) {
-        return idToListedToken[_tokenId];
-    }
-
-    function getRoyaltyFees(uint256 _tokenId) public view returns (uint256) {
-        require(_exists(_tokenId), "Token does not exist");
-        return royaltyFees[_tokenId];
-    }
-
-    // Sale Activity and time left for the sale to end
-    function saleActivity() public view returns (bool _saleActivity){
-        if(block.timestamp > startTime && block.timestamp < startTime + duration){
-            _saleActivity = true;
+    // View function to check if the sale is active and how much time is left
+    function saleActivity()
+        public
+        view
+        returns (bool isActive, uint256 timeLeft)
+    {
+        if (
+            block.timestamp > startTime &&
+            block.timestamp < startTime + duration
+        ) {
+            isActive = true;
+            timeLeft = startTime + duration - block.timestamp;
         } else {
-            _saleActivity = false;
+            isActive = false;
+            timeLeft = 0;
         }
-        return _saleActivity;
     }
-    function getStartTime() public view returns(uint256){
-        require(startTime>0, "Sale has not been listed yet");
-        return startTime;
-    }
-    function saleTimeLeft() public view returns (uint256 timeLeft) {
-        require(startTime>0, "Sale has not been listed yet");
-        timeLeft = startTime + duration - block.timestamp;
-    }
- 
-    //Returns all the NFTs that the current user is owner or seller in
+
+    // View function to get all NFTs owned by the caller
     function getMyNFTs() public view returns (ListedToken[] memory) {
-        uint totalItemCount = _finalTokenId - 1; 
-        uint itemCount = 0;
-        uint currentIndex = 0;
-        uint currentId;
-        // Get a count of all the NFTs that belong to the user
-        for (uint i = 0; i < totalItemCount; i++) {
+        uint256 totalItemCount = totalSupply();
+        uint256 itemCount = 0;
+        uint256 currentIndex = 0;
+
+        // Count NFTs owned by the caller
+        for (uint256 i = 1; i <= totalItemCount; i++) {
             if (
-                idToListedToken[i + 1].owner == msg.sender ||
-                idToListedToken[i + 1].lastOwner == msg.sender
+                idToListedToken[i].owner == msg.sender ||
+                idToListedToken[i].lastOwner == msg.sender
             ) {
-                itemCount += 1;
+                itemCount++;
             }
         }
 
-        // Storing all the relevant NFTs in an array
+        // Populate and return the result array
         ListedToken[] memory items = new ListedToken[](itemCount);
-        for (uint i = 0; i < totalItemCount; i++) {
+        for (uint256 i = 1; i <= totalItemCount; i++) {
             if (
-                idToListedToken[i + 1].owner == msg.sender ||
-                idToListedToken[i + 1].lastOwner == msg.sender
+                idToListedToken[i].owner == msg.sender ||
+                idToListedToken[i].lastOwner == msg.sender
             ) {
-                currentId = i + 1;
-                ListedToken storage currentItem = idToListedToken[currentId];
-                items[currentIndex] = currentItem;
-                currentIndex += 1;
+                items[currentIndex] = idToListedToken[i];
+                currentIndex++;
             }
         }
         return items;
