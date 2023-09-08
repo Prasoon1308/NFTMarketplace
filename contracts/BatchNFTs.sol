@@ -4,10 +4,9 @@ pragma solidity ^0.8.13;
 
 import "./ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 // Main contract for BatchNFTs
-contract BatchNFTs is Ownable, ERC721A, ReentrancyGuard {
+contract BatchNFTs is Ownable, ERC721A {
     // State variables
     uint256 public commissionFees;
     uint256 public startTime;
@@ -60,7 +59,7 @@ contract BatchNFTs is Ownable, ERC721A, ReentrancyGuard {
 
     // Constructor to initialize state variables
     constructor(uint256 _commissionFees, uint256 _duration)
-        ERC721A("Azuki NFT", "AZUKI")
+        ERC721A("Shibuki.io", "SHIBUKI")
     {
         moderator[msg.sender] = true;
         canMint[msg.sender] = true;
@@ -125,7 +124,7 @@ contract BatchNFTs is Ownable, ERC721A, ReentrancyGuard {
         uint256 fees,
         Category batchCategory,
         string[] memory _tokenURIs
-    ) public onlyArtist nonReentrant {
+    ) public onlyArtist {
         require(
             _tokenURIs.length == quantity,
             "Mismatch between URIs and quantity"
@@ -290,10 +289,9 @@ contract BatchNFTs is Ownable, ERC721A, ReentrancyGuard {
         uint256 currentIndex = 0;
 
         // Count NFTs owned by the caller
-        for (uint256 i = 1; i <= totalItemCount; i++) {
+        for (uint256 i = 0; i <= totalItemCount; i++) {
             if (
-                idToListedToken[i].owner == msg.sender ||
-                idToListedToken[i].lastOwner == msg.sender
+                idToListedToken[i].owner == msg.sender
             ) {
                 itemCount++;
             }
@@ -301,10 +299,9 @@ contract BatchNFTs is Ownable, ERC721A, ReentrancyGuard {
 
         // Populate and return the result array
         ListedToken[] memory items = new ListedToken[](itemCount);
-        for (uint256 i = 1; i <= totalItemCount; i++) {
+        for (uint256 i = 0; i <= totalItemCount; i++) {
             if (
-                idToListedToken[i].owner == msg.sender ||
-                idToListedToken[i].lastOwner == msg.sender
+                idToListedToken[i].owner == msg.sender
             ) {
                 items[currentIndex] = idToListedToken[i];
                 currentIndex++;
